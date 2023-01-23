@@ -18,6 +18,13 @@ type Candle =
         TakerBuyQuoteAssetVolume : decimal
     }
 
+type RiskRewardProfile = 
+    {
+        Upside : decimal
+        Downside : decimal
+        RiskRewardRatio : decimal
+    }
+
 type CandleStore = Map<string, Candle array>
     
 let arrToCandle (arr:decimal array) = 
@@ -37,24 +44,56 @@ let klinesToCandles (arr:decimal array array) =
     arr |> Array.map arrToCandle
 
 let latestCandle candleArray = 
-    candleArray 
-    |> Array.sortByDescending (fun x -> x.OpenTime) 
-    |> Array.head
+    try 
+        candleArray 
+        |> Array.sortByDescending (fun x -> x.OpenTime) 
+        |> Array.head
+        |> Some
+    with
+        | _ -> None
 
 let latestSymbolDates startDate candleStore availableCoins = 
     let latestStoreSymbolDates = 
         candleStore 
-        |> Map.map (fun key value -> (latestCandle value).OpenTime)
+        |> Map.map (fun key value -> 
+            match latestCandle value with
+                | Some c -> c.OpenTime
+                | None -> startDate)
     let initialSymbolDates = 
         availableCoins
-        |> Seq.map (fun (b,c) -> b, startDate)
-        |> Map.ofSeq
+        |> Map.map (fun k v -> k, startDate)
 
-    ExtraMap.fullOuterJoin 
-        latestStoreSymbolDates 
-        initialSymbolDates
-    |> Map.map (fun key (left, right) -> 
-        match (left, right) with
-        | Some l, _ -> l
-        | _ -> startDate
-    )
+    let results = 
+        ExtraMap.fullOuterJoin 
+            latestStoreSymbolDates 
+            initialSymbolDates
+        |> Map.map (fun key (left, right) -> 
+            match (left, right) with
+            | Some l, _ -> l
+            | _ -> startDate
+        )
+    printfn "Latest symbol dates: %A" results
+    results
+
+let makeRiskRewardProfile candles =
+    try 
+        let high = candles |> Array.map (fun x -> x.High) |> Array.max
+        let low = candles |> Array.map (fun x -> x.Low) |> Array.min
+        let latest = (candles |> Array.last).Close 
+        let risk = latest - low
+        let reward = high - latest
+        {
+            Upside = reward / latest
+            Downside = risk / latest
+            RiskRewardRatio = reward / risk
+        } |> Some
+    with
+        | _ -> None
+
+let mapRiskRewardProfile candleStore =
+    candleStore 
+    |> Map.map (fun k v -> makeRiskRewardProfile v)
+    |> Map.toArray
+    |> Array.filter (fun (k, v) -> v <> None)
+    |> Array.map (fun (k, v) -> k, v.Value)
+    |> Map.ofArray

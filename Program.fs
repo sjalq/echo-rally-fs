@@ -22,31 +22,37 @@ type CMCList = JsonProvider<"jsonSamples/cmcList.json">
 let availableCoins = 
     let streamReader = new StreamReader("jsonSamples/binanceExchangeInfo.json")
     let binanceExchangeInfo = ExchangeInfo.Load(streamReader)
-    let binanceList = binanceExchangeInfo.Symbols |> Array.map (fun x -> x) |> Array.filter (fun x -> x.QuoteAsset = "USDT")
+    let binanceList = 
+        binanceExchangeInfo.Symbols 
+        |> Array.filter (fun x -> x.QuoteAsset = "USDT")
+        |> Array.map (fun x -> x.BaseAsset, x)
+        |> Map.ofArray
+    // printfn "BinanceList %A" binanceList.Count
 
     let streamReader = new StreamReader("jsonSamples/cmcList.json")
     let cmc = CMCList.Load(streamReader)
     let cmcList = 
         cmc.Data
         |> Array.sortBy (fun x -> x.JsonValue.["rank"])
-        |> Array.take 500
+        |> Array.take 100
+        |> Array.map (fun x -> x.Symbol, x)
+        |> Map.ofArray
+    // printfn "CMCList %A" cmcList
 
-    Enumerable.Join
-        ( binanceList
-        , cmcList
-        , (fun b -> b.QuoteAsset)
-        , (fun c -> c.Symbol)
-        , (fun b c -> b.Symbol, c)
-        )
-    |> Seq.sortBy (fun (b,c) -> c.JsonValue.["rank"])
+    ExtraMap.innerJoin
+        binanceList
+        cmcList
+    |> Map.map (fun k (l, r) -> 0 )
+
 
 let mutable globalCache = Map.empty<string, Candle array>
 globalCache <- deserializeJsonFile "data/globalCache.json"
 let march_1_2022 = 1646170171000UL // The start of our interested period
 
+printfn "Available Coins: %A" availableCoins
 let symbolDatesToFetch  = 
     latestSymbolDates march_1_2022 globalCache availableCoins
-    |> ExtraMap.take 10
+    // |> ExtraMap.take 10
 
 type CandleInfo = JsonProvider<"jsonSamples/binancePriceHistory.json">
 
@@ -54,7 +60,7 @@ let fetchCandles symbol startDate =
     printfn "Fetching %s from %A" symbol startDate
     let url = 
         String.Format(
-            "https://api.binance.com/api/v3/klines?symbol={0}&interval=1h&startTime={1}"
+            "https://api.binance.com/api/v3/klines?symbol={0}&interval=1d&startTime={1}"
             , symbol
             , startDate
         )
@@ -62,7 +68,10 @@ let fetchCandles symbol startDate =
     |> klinesToCandles
 
 let fetchMissingData symbolDatesToFetch =
-    symbolDatesToFetch |> Map.map fetchCandles 
+    symbolDatesToFetch 
+    |> Map.toArray
+    |> Array.Parallel.map (fun (symbol, startDate) -> symbol, fetchCandles symbol startDate)
+    |> Map.ofArray 
 
 let updateCache cache dataToAdd =
     ExtraMap.fullOuterJoin
@@ -80,6 +89,33 @@ let updateCache cache dataToAdd =
 let newCache = updateCache globalCache (fetchMissingData symbolDatesToFetch)
 
 newCache |> serializeJsonFile "data/globalCache.json"
+
+globalCache <- newCache
+
+// find the coins with the best R/R between their highs, lows and current price
+// globalCache 
+// |> Map.map (fun k v -> makeRiskRewardProfile v)
+// |> Map.toArray
+// |> Array.filter (fun (k, v) -> v <> None)
+// |> Array.map (fun (k, v) -> k, v.Value)
+// |> Array.sortByDescending (fun (k, v) -> v.RiskRewardRatio)
+// |> Array.take 100
+// |> Array.iter (fun (k, v) -> printfn "%s: RR:%A Upside:%A" k v.RiskRewardRatio v.Upside)
+
+let results = 
+    globalCache 
+    |> mapRiskRewardProfile
+    |> rankMultipleUnified 
+        [|
+            (fun x -> (x.Upside)), Descending
+            //(fun x -> (x.Downside)), Ascending
+            //(fun x -> (x.RiskRewardRatio)), Descending
+        |]
+        manhattanDistance
+    |> Array.map (fun (k, (v, r)) -> sprintf "%s: Downside:%A Upside:%A Rank:%A" k v.Downside v.Upside r)
+
+File.WriteAllLines("data/rankings.txt", results)
+
 
 [<EntryPoint>]
 let main argv =
