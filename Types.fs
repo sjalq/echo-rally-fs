@@ -22,7 +22,7 @@ type CandleStore = Map<string, Candle array>
     
 let arrToCandle (arr:decimal array) = 
     {
-        OpenTime = arr.[0] |> Decimal.ToInt64
+        OpenTime = arr.[0] |> Decimal.ToUInt64
         Open = arr.[1]
         High = arr.[1]
         Low = arr.[1]
