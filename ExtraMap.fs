@@ -109,10 +109,12 @@ let isOk result =
 let getValue result = 
     match result with 
     | Ok v -> v
+    | _ -> failwith "No value"
 
 let getError result =
     match result with
     | Error e -> e
+    | _ -> failwith "No error"
     
 let take x table = 
     table 

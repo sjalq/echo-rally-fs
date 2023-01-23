@@ -4,6 +4,7 @@ open JsonFileProcessing
 open ExtraMap
 open FSharp.Data
 open System.Linq
+open System.IO
 
 // For more information see https://aka.ms/fsharp-console-apps
 printfn "Hello from F#"
@@ -19,10 +20,12 @@ type ExchangeInfo = JsonProvider<"jsonSamples/binanceExchangeInfo.json">
 type CMCList = JsonProvider<"jsonSamples/cmcList.json">
 
 let availableCoins = 
-    let binanceExchangeInfo = ExchangeInfo.Load("jsonSamples/binanceExchangeInfo.json")
+    let streamReader = new StreamReader("jsonSamples/binanceExchangeInfo.json")
+    let binanceExchangeInfo = ExchangeInfo.Load(streamReader)
     let binanceList = binanceExchangeInfo.Symbols |> Array.map (fun x -> x) |> Array.filter (fun x -> x.QuoteAsset = "USDT")
 
-    let cmc = CMCList.Load("cmcList.json")
+    let streamReader = new StreamReader("jsonSamples/cmcList.json")
+    let cmc = CMCList.Load(streamReader)
     let cmcList = 
         cmc.Data
         |> Array.sortBy (fun x -> x.JsonValue.["rank"])
@@ -77,3 +80,8 @@ let updateCache cache dataToAdd =
 let newCache = updateCache globalCache (fetchMissingData symbolDatesToFetch)
 
 newCache |> serializeJsonFile "data/globalCache.json"
+
+[<EntryPoint>]
+let main argv =
+    printfn "Hello World!"
+    0 // return an integer exit code

@@ -2,3 +2,5 @@ obj/
 bin/
 obj
 .fake
+obj/fsac.cache
+obj/fsac.cache
