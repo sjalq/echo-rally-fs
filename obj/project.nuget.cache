@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "JgN8pIIhTVUguJkzrtm0NQ+pP7WRVLEJQrgYNBt7ax75/ITLDVQ228YA/JUQQSt4/LA2i/uiVE2OU3n0kjC1iQ==",
+  "success": true,
+  "projectFilePath": "/Users/sjalq/git/echo-rally-fs/echo-rally-fs.fsproj",
+  "expectedPackageFiles": [
+    "/Users/sjalq/.nuget/packages/fsharp.core/7.0.0/fsharp.core.7.0.0.nupkg.sha512",
+    "/Users/sjalq/.nuget/packages/fsharp.data/5.0.2/fsharp.data.5.0.2.nupkg.sha512",
+    "/Users/sjalq/.nuget/packages/fsharp.json/0.4.1/fsharp.json.0.4.1.nupkg.sha512"
+  ],
+  "logs": []
+}
