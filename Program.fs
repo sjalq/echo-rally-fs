@@ -41,11 +41,14 @@ let mutable globalCache = Map.empty<string, Candle array>
 globalCache <- deserializeJsonFile "data/globalCache.json"
 let march_1_2022 = 1646170171000UL // The start of our interested period
 
-let symbolDatesToFetch  = latestSymbolDates march_1_2022 globalCache availableCoins
+let symbolDatesToFetch  = 
+    latestSymbolDates march_1_2022 globalCache availableCoins
+    |> ExtraMap.take 10
 
 type CandleInfo = JsonProvider<"jsonSamples/binancePriceHistory.json">
 
 let fetchCandles symbol startDate =
+    printfn "Fetching %s from %A" symbol startDate
     let url = 
         String.Format(
             "https://api.binance.com/api/v3/klines?symbol={0}&interval=1h&startTime={1}"
@@ -72,3 +75,5 @@ let updateCache cache dataToAdd =
     )
 
 let newCache = updateCache globalCache (fetchMissingData symbolDatesToFetch)
+
+newCache |> serializeJsonFile "data/globalCache.json"

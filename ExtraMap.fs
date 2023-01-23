@@ -114,3 +114,8 @@ let getError result =
     match result with
     | Error e -> e
     
+let take x table = 
+    table 
+    |> Map.toArray
+    |> Array.take x
+    |> Map.ofArray

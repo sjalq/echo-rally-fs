@@ -206,7 +206,8 @@
           },
           "FSharp.Data": {
             "target": "Package",
-            "version": "[5.0.2, )"
+            "version": "[5.0.2, )",
+            "generatePathProperty": true
           },
           "FSharp.Json": {
             "target": "Package",
