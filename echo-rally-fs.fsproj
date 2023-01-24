@@ -1,11 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net7.0</TargetFramework>
     <RootNamespace>echo_rally_fs</RootNamespace>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="ExtraMap.fs" />
     <Compile Include="Types.fs" />
@@ -13,10 +11,8 @@
     <Compile Include="Delay.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="FSharp.Data" Version="5.0.2" />
     <PackageReference Include="FSharp.Json" Version="0.4.1" />
   </ItemGroup>
-
 </Project>

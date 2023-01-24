@@ -38,6 +38,17 @@ let rightOuterJoin left right =
 let innerJoin left right =
     fullOuterJoin left right |> getInner
 
+let merge first second = 
+    fullOuterJoin first second
+    |> Map.map (
+        fun k (f, s) -> 
+            match (f, s) with
+            | Some f, Some s -> f
+            | Some f, None -> f
+            | None, Some s -> s
+            | None, None -> failwith "This should not happen"
+        )
+
 let findKeysNotInMap keys table =
     keys |> Seq.filter (fun key -> table |> Map.containsKey key |> not)
 

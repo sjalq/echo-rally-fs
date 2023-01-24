@@ -5,6 +5,7 @@ open ExtraMap
 open FSharp.Data
 open System.Linq
 open System.IO
+open Delay
 
 // For more information see https://aka.ms/fsharp-console-apps
 printfn "Hello from F#"
@@ -16,32 +17,37 @@ printfn "Hello from F#"
 // do calculations
 // give list of best R/R coins
 
-type ExchangeInfo = JsonProvider<"jsonSamples/binanceExchangeInfo.json">
+type BinanceExchangeInfo = JsonProvider<"jsonSamples/binanceExchangeInfo.json">
+type KucoinSymbols = JsonProvider<"jsonSamples/kucoinSymbols.json">
 type CMCList = JsonProvider<"jsonSamples/cmcList.json">
 
-let availableCoins = 
-    let streamReader = new StreamReader("jsonSamples/binanceExchangeInfo.json")
-    let binanceExchangeInfo = ExchangeInfo.Load(streamReader)
-    let binanceList = 
-        binanceExchangeInfo.Symbols 
-        |> Array.filter (fun x -> x.QuoteAsset = "USDT")
-        |> Array.map (fun x -> x.BaseAsset, x)
-        |> Map.ofArray
-    // printfn "BinanceList %A" binanceList.Count
+let binanceExchangeInfo = new StreamReader("jsonSamples/binanceExchangeInfo.json") |> BinanceExchangeInfo.Load
+let binanceList = 
+    binanceExchangeInfo.Symbols 
+    |> Array.filter (fun x -> x.QuoteAsset = "USDT")
+    |> Array.map (fun x -> x.BaseAsset, x)
+    |> Map.ofArray
 
-    let streamReader = new StreamReader("jsonSamples/cmcList.json")
-    let cmc = CMCList.Load(streamReader)
-    let cmcList = 
-        cmc.Data
-        |> Array.sortBy (fun x -> x.JsonValue.["rank"])
-        |> Array.take 100
-        |> Array.map (fun x -> x.Symbol, x)
-        |> Map.ofArray
-    // printfn "CMCList %A" cmcList
+let kucoinSymbols = new StreamReader("jsonSamples/kucoinSymbols.json") |> KucoinSymbols.Load
+let kucoinList = 
+    kucoinSymbols.Data 
+    |> Array.filter (fun x -> x.QuoteCurrency = "USDT")
+    |> Array.map (fun x -> x.BaseCurrency, x)
+    |> Map.ofArray
 
-    ExtraMap.innerJoin
+let cmc = new StreamReader("jsonSamples/cmcList.json") |> CMCList.Load
+let cmcList = 
+    cmc.Data
+    |> Array.sortBy (fun x -> x.JsonValue.["rank"])
+    |> Array.take 1000
+    |> Array.map (fun x -> x.Symbol, x)
+    |> Map.ofArray
+
+let availableCoins =
+    ExtraMap.fullOuterJoin 
         binanceList
-        cmcList
+        kucoinList
+    |> ExtraMap.innerJoin cmcList
     |> Map.map (fun k (l, r) -> 0 )
 
 
@@ -54,24 +60,42 @@ let symbolDatesToFetch  =
     latestSymbolDates march_1_2022 globalCache availableCoins
     // |> ExtraMap.take 10
 
-type CandleInfo = JsonProvider<"jsonSamples/binancePriceHistory.json">
+type BinanceCandleInfo = JsonProvider<"jsonSamples/binancePriceHistory.json">
 
-let fetchCandles symbol startDate =
-    printfn "Fetching %s from %A" symbol startDate
+let fetchBinanceCandles symbol startDate =
+    printfn "Binance : Fetching %s from %A" symbol startDate
     let url = 
         String.Format(
             "https://api.binance.com/api/v3/klines?symbol={0}&interval=1d&startTime={1}"
-            , symbol
+            , symbol + "USDT"
             , startDate
         )
-    CandleInfo.Load(url)
-    |> klinesToCandles
+    BinanceCandleInfo.Load(url)
+    |> binanceKlinesToCandles
 
-let fetchMissingData symbolDatesToFetch =
-    symbolDatesToFetch 
-    |> Map.toArray
-    |> Array.Parallel.map (fun (symbol, startDate) -> symbol, fetchCandles symbol startDate)
-    |> Map.ofArray 
+type KucoinCandleInfo = JsonProvider<"jsonSamples/kucoinKlines.json">
+
+let delayPeriod = 300
+let mutable lastTimeCalled = None
+let fetchKucoinCandles symbol startDate =
+    lastTimeCalled <- delay delayPeriod lastTimeCalled
+    printfn "Kucoin : Fetching %s from %A" symbol startDate
+    let url = 
+        String.Format(
+            "https://api.kucoin.com/api/v1/market/candles?symbol={0}&type=1day&startAt={1}"
+            , symbol + "-USDT"
+            , startDate / 1000UL
+        )
+    KucoinCandleInfo.Load(url).Data
+    |> kucoinKlinesToCandles
+
+let fetchNewData symbolDatesToFetch (exchangeList:Map<string,'b>) updateFunction allowParallel =
+    symbolDatesToFetch
+        |> Map.filter (fun symbol _ -> exchangeList.ContainsKey symbol)
+        |> Map.toArray
+        |> (if allowParallel then Array.Parallel.map else Array.map) 
+            (fun (symbol, startDate) -> symbol, updateFunction symbol startDate)
+        |> Map.ofArray
 
 let updateCache cache dataToAdd =
     ExtraMap.fullOuterJoin
@@ -86,21 +110,14 @@ let updateCache cache dataToAdd =
         | None, None -> failwith "This should never happen"
     )
 
-let newCache = updateCache globalCache (fetchMissingData symbolDatesToFetch)
+//let binanceUpdate = fetchMissingData symbolDatesToFetch binanceList fetchBinanceCandles
+let kucoinUpdate = fetchNewData symbolDatesToFetch kucoinList fetchKucoinCandles false
+let fullUpdate = kucoinUpdate // ExtraMap.merge binanceUpdate kucoinUpdate
+let newCache = updateCache globalCache fullUpdate
 
 newCache |> serializeJsonFile "data/globalCache.json"
 
 globalCache <- newCache
-
-// find the coins with the best R/R between their highs, lows and current price
-// globalCache 
-// |> Map.map (fun k v -> makeRiskRewardProfile v)
-// |> Map.toArray
-// |> Array.filter (fun (k, v) -> v <> None)
-// |> Array.map (fun (k, v) -> k, v.Value)
-// |> Array.sortByDescending (fun (k, v) -> v.RiskRewardRatio)
-// |> Array.take 100
-// |> Array.iter (fun (k, v) -> printfn "%s: RR:%A Upside:%A" k v.RiskRewardRatio v.Upside)
 
 let results = 
     globalCache 

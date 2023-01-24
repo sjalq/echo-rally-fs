@@ -18,6 +18,7 @@ type Candle =
         TakerBuyQuoteAssetVolume : decimal
     }
 
+
 type RiskRewardProfile = 
     {
         Upside : decimal
@@ -25,23 +26,45 @@ type RiskRewardProfile =
         RiskRewardRatio : decimal
     }
 
+
 type CandleStore = Map<string, Candle array>
     
-let arrToCandle (arr:decimal array) = 
+
+let binanceArrToCandle (arr:decimal array) = 
     {
         OpenTime = arr.[0] |> Decimal.ToUInt64
         Open = arr.[1]
-        High = arr.[1]
-        Low = arr.[1]
-        Close = arr.[1]
-        Volume = arr.[1]
-        QuoteAssetVolume = arr.[1]
-        TakerBuyBaseAssetVolume = arr.[1]
-        TakerBuyQuoteAssetVolume = arr.[1]
+        High = arr.[2]
+        Low = arr.[3]
+        Close = arr.[4]
+        Volume = arr.[5]
+        QuoteAssetVolume = arr.[6]
+        TakerBuyBaseAssetVolume = arr.[7]
+        TakerBuyQuoteAssetVolume = arr.[8]
     }
 
-let klinesToCandles (arr:decimal array array) =
-    arr |> Array.map arrToCandle
+
+let binanceKlinesToCandles (arr:decimal array array) =
+    arr |> Array.map binanceArrToCandle
+
+
+let kucoinArrToCandle (arr: decimal array) =
+    {
+        OpenTime = arr.[0] * 1000M |> Decimal.ToUInt64
+        Open = arr.[1]
+        Close = arr.[2]
+        High = arr.[3]
+        Low = arr.[4]
+        Volume = arr.[5]
+        QuoteAssetVolume = arr.[6]
+        TakerBuyBaseAssetVolume = -1M
+        TakerBuyQuoteAssetVolume = -1M
+    }
+
+
+let kucoinKlinesToCandles (arr:decimal array array) =
+    arr |> Array.map kucoinArrToCandle
+
 
 let latestCandle candleArray = 
     try 
@@ -75,6 +98,7 @@ let latestSymbolDates startDate candleStore availableCoins =
     printfn "Latest symbol dates: %A" results
     results
 
+
 let makeRiskRewardProfile candles =
     try 
         let high = candles |> Array.map (fun x -> x.High) |> Array.max
@@ -89,6 +113,7 @@ let makeRiskRewardProfile candles =
         } |> Some
     with
         | _ -> None
+
 
 let mapRiskRewardProfile candleStore =
     candleStore 
