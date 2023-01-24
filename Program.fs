@@ -6,6 +6,7 @@ open FSharp.Data
 open System.Linq
 open System.IO
 open Delay
+open System.Threading
 
 // For more information see https://aka.ms/fsharp-console-apps
 printfn "Hello from F#"
@@ -89,6 +90,8 @@ let fetchKucoinCandles symbol startDate =
     KucoinCandleInfo.Load(url).Data
     |> kucoinKlinesToCandles
 
+let fetchKucoinCandlesCooled = cooldownRetryWrapper 10 10000 fetchKucoinCandles
+
 let fetchNewData symbolDatesToFetch (exchangeList:Map<string,'b>) updateFunction allowParallel =
     symbolDatesToFetch
         |> Map.filter (fun symbol _ -> exchangeList.ContainsKey symbol)
@@ -110,9 +113,9 @@ let updateCache cache dataToAdd =
         | None, None -> failwith "This should never happen"
     )
 
-//let binanceUpdate = fetchMissingData symbolDatesToFetch binanceList fetchBinanceCandles
-let kucoinUpdate = fetchNewData symbolDatesToFetch kucoinList fetchKucoinCandles false
-let fullUpdate = kucoinUpdate // ExtraMap.merge binanceUpdate kucoinUpdate
+let binanceUpdate = fetchNewData symbolDatesToFetch binanceList fetchBinanceCandles false
+//let kucoinUpdate = fetchNewData symbolDatesToFetch kucoinList fetchKucoinCandlesCooled false
+let fullUpdate = binanceUpdate // ExtraMap.merge binanceUpdate kucoinUpdate
 let newCache = updateCache globalCache fullUpdate
 
 newCache |> serializeJsonFile "data/globalCache.json"

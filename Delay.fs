@@ -16,3 +16,17 @@ let delay milliseconds (lastTimeCalled : DateTime Option) =
             Some DateTime.Now
     | None -> 
         Some DateTime.Now
+
+
+let cooldownRetryWrapper maxRetries (delayMs:int) fn =
+    let rec tryWrapper (i:int) x =
+        try
+            fn x
+        with _ as ex ->
+            if i < maxRetries then
+                System.Threading.Thread.Sleep(delayMs)
+                printfn "Exception hit, cooling down"
+                tryWrapper (i+1) x
+            else
+                raise ex
+    tryWrapper 0
