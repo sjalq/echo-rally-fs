@@ -87,7 +87,8 @@ let fetchKucoinCandles symbol startDate =
             , symbol + "-USDT"
             , startDate / 1000UL
         )
-    KucoinCandleInfo.Load(url).Data
+    let load = cooldownRetryWrapper 10 10000 (fun (url:string) -> KucoinCandleInfo.Load(url))
+    (load url).Data
     |> kucoinKlinesToCandles
 
 let fetchKucoinCandlesCooled = cooldownRetryWrapper 10 10000 fetchKucoinCandles
@@ -124,6 +125,8 @@ globalCache <- newCache
 
 let results = 
     globalCache 
+    |> ExtraMap.innerJoin cmcList
+    |> Map.map (fun k (l, r) -> r)
     |> mapRiskRewardProfile
     |> rankMultipleUnified 
         [|
@@ -132,10 +135,16 @@ let results =
             //(fun x -> (x.RiskRewardRatio)), Descending
         |]
         manhattanDistance
-    |> Array.map (fun (k, (v, r)) -> sprintf "%s: Downside:%A Upside:%A Rank:%A" k v.Downside v.Upside r)
+    |> Array.map (fun (k, (v, r)) -> {|Coin = k; Rank = r; RRProfile = v |})
 
-File.WriteAllLines("data/rankings.txt", results)
+let x = results.[results.Length/2] 
+printfn "%s: Downside:%A Upside:%A Rank:%A" x.Coin x.RRProfile.Downside x.RRProfile.Upside x.Rank
 
+let testResults = 
+    results
+    |> Array.map (fun x -> sprintf "%s: Downside:%A Upside:%A RR:%A" x.Coin x.RRProfile.Downside x.RRProfile.Upside x.RRProfile.RiskRewardRatio)
+
+File.WriteAllLines("data/rankings.txt", testResults)
 
 [<EntryPoint>]
 let main argv =

@@ -2,8 +2,17 @@ module Types
 
 open System
 
+
+let second = 1000UL
+let minute = 60UL * second
+let hour = 60UL * minute
+let day = 24UL * hour
+let week = 7UL * day
+
+
 let nowString () = 
     DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss")
+
 
 type Candle = 
     { 
@@ -92,7 +101,7 @@ let latestSymbolDates startDate candleStore availableCoins =
             initialSymbolDates
         |> Map.map (fun key (left, right) -> 
             match (left, right) with
-            | Some l, _ -> l
+            | Some l, _ -> l + day
             | _ -> startDate
         )
     printfn "Latest symbol dates: %A" results

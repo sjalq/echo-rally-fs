@@ -7,3 +7,7 @@ obj/fsac.cache
 data/globalCache copy.json
 data/globalCache _1h.json
 obj/fsac.cache
+data/globalCache _old2.json
+data/rankings upside 2.txt
+data/rankings upside.txt
+.gitignore
